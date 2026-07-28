@@ -5,6 +5,11 @@
 [build.environment]
   NODE_VERSION = "22"
   BUILD_TARGET = "static"
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+  enabled = false
 
 [[redirects]]
   from = "/*"
