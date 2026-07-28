@@ -1,0 +1,7 @@
+node_modules
+dist
+.next
+.wrangler
+.npm-cache
+.DS_Store
+*.local
