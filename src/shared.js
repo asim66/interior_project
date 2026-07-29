@@ -266,11 +266,24 @@ export function getVendorCategories(data){
 export const SESSION_USER_KEY = 'studio_ledger_session_user_v1';
 
 export const DEFAULT_USERS = [
+  { id: 'usr_owner', name: 'Studio Owner', email: 'owner@studiovista.in', role: 'super_admin', roleLabel: 'Studio Owner / Super Admin', pin: '9999', avatar: 'SO', color: '#f59e0b' },
   { id: 'usr_admin', name: 'Ananya Sharma', email: 'admin@studiovista.in', role: 'admin', roleLabel: 'Principal Architect', pin: '1234', avatar: 'AS', color: '#6366f1' },
   { id: 'usr_designer', name: 'Rahul Verma', email: 'designer@studiovista.in', role: 'designer', roleLabel: 'Senior Designer', pin: '1234', avatar: 'RV', color: '#ec4899' },
   { id: 'usr_supervisor', name: 'Vikram Singh', email: 'site@studiovista.in', role: 'site_supervisor', roleLabel: 'Site Supervisor', pin: '1234', avatar: 'VS', color: '#10b981' },
   { id: 'usr_finance', name: 'Priya Mehta', email: 'finance@studiovista.in', role: 'finance', roleLabel: 'Finance Lead', pin: '1234', avatar: 'PM', color: '#f59e0b' },
 ];
+
+export function isSuperAdmin(user) {
+  return user?.role === 'super_admin';
+}
+
+export function isAdmin(user) {
+  return user?.role === 'admin' || user?.role === 'super_admin';
+}
+
+export function canManageUsers(user) {
+  return user?.role === 'admin' || user?.role === 'super_admin';
+}
 
 export function loadSession() {
   if (typeof window === 'undefined') return null;

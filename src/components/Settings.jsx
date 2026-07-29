@@ -83,14 +83,21 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   };
 
   const ROLE_LABELS = {
+    super_admin: 'Studio Owner / Super Admin 👑',
     admin: 'Principal Architect / Admin',
     designer: 'Interior Designer',
     site_supervisor: 'Site Supervisor',
     finance: 'Finance / Accounts Lead',
   };
 
+  const canManage = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+
   const handleAddUserSubmit = (e) => {
     e.preventDefault();
+    if (!canManage) {
+      flash('Only Super Admins or Admins can add team members.');
+      return;
+    }
     if (!uName.trim() || !uEmail.trim() || !uPin.trim()) {
       flash('Please fill out all fields');
       return;
@@ -108,7 +115,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
       roleLabel: ROLE_LABELS[uRole] || 'Team Member',
       pin: uPin.trim(),
       avatar,
-      color: uRole === 'admin' ? '#6366f1' : uRole === 'finance' ? '#f59e0b' : uRole === 'site_supervisor' ? '#10b981' : '#ec4899',
+      color: uRole === 'super_admin' ? '#f59e0b' : uRole === 'admin' ? '#6366f1' : uRole === 'finance' ? '#f59e0b' : uRole === 'site_supervisor' ? '#10b981' : '#ec4899',
     };
 
     setData(d => ({ ...d, users: [...(d.users || []), newUser] }));
@@ -120,6 +127,10 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   };
 
   const handleSavePin = (user) => {
+    if (!canManage && currentUser?.id !== user.id) {
+      flash('Permission denied.');
+      return;
+    }
     if (!newPin.trim()) {
       flash('PIN cannot be empty');
       return;
@@ -131,6 +142,38 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
     setEditingPinUser(null);
     setNewPin('');
     flash(`PIN updated for ${user.name}`);
+  };
+
+  const handleDeleteUser = (user) => {
+    if (!canManage) {
+      flash('Only Super Admins or Admins can delete team members.');
+      return;
+    }
+    if (user.id === currentUser?.id) {
+      flash('You cannot delete your own active account.');
+      return;
+    }
+    const superAdminCount = users.filter(u => u.role === 'super_admin').length;
+    if (user.role === 'super_admin' && superAdminCount <= 1) {
+      flash('Cannot delete the sole Super Admin account.');
+      return;
+    }
+    if (confirm(`Are you sure you want to delete "${user.name}" (${user.email})? This action cannot be undone.`)) {
+      setData(d => ({
+        ...d,
+        users: (d.users || []).filter(u => u.id !== user.id)
+      }));
+      flash(`User ${user.name} removed from studio`);
+    }
+  };
+
+  const handleUpdateRole = (user, role) => {
+    if (!canManage) return;
+    setData(d => ({
+      ...d,
+      users: (d.users || []).map(u => u.id === user.id ? { ...u, role, roleLabel: ROLE_LABELS[role] || 'Team Member' } : u)
+    }));
+    flash(`Updated ${user.name} role to ${ROLE_LABELS[role]}`);
   };
 
   const M=n=>fmt(n,S.currency);
@@ -175,7 +218,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
       <div className="card" style={{marginTop:18}}>
         <div className="card-h">
           <h3>Studio Team &amp; User Accounts</h3>
-          <button className="btn primary sm" onClick={() => setShowAddUser(true)}>+ Add Team Member</button>
+          {canManage && <button className="btn primary sm" onClick={() => setShowAddUser(true)}>+ Add Team Member</button>}
         </div>
         <div className="pad">
           <div className="desc" style={{marginBottom:12}}>
@@ -184,21 +227,38 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
           <div className="category-list">
             {users.map(u => (
               <div className="category-item" key={u.id}>
-                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div style={{display:'flex',alignItems:'center',gap:12,flex:1}}>
                   <div className="avatar" style={{backgroundColor:u.color||'#6366f1'}}>
                     {u.avatar}
                   </div>
-                  <div>
-                    <div style={{fontWeight:600,fontSize:13}}>
-                      {u.name} {currentUser?.id === u.id && <span className="pill green" style={{fontSize:10,padding:'2px 6px',marginLeft:6}}>You</span>}
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:600,fontSize:13,display:'flex',alignItems:'center',gap:6}}>
+                      {u.name}
+                      {currentUser?.id === u.id && <span className="pill green" style={{fontSize:10,padding:'2px 6px'}}>You</span>}
+                      {u.role === 'super_admin' && <span className="pill amber" style={{fontSize:10,padding:'2px 6px'}}>SUPER ADMIN 👑</span>}
                     </div>
-                    <div style={{fontSize:11,color:'var(--muted)'}}>
-                      {u.email} · {ROLE_LABELS[u.role] || u.roleLabel || u.role}
+                    <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>
+                      {u.email} · {canManage ? (
+                        <select
+                          value={u.role}
+                          onChange={e => handleUpdateRole(u, e.target.value)}
+                          style={{fontSize:11,padding:'1px 4px',marginLeft:4,border:'1px solid var(--line-2)',borderRadius:4}}
+                          disabled={u.id === currentUser?.id && u.role === 'super_admin'}
+                        >
+                          <option value="super_admin">Studio Owner / Super Admin 👑</option>
+                          <option value="admin">Principal Architect / Admin</option>
+                          <option value="designer">Interior Designer</option>
+                          <option value="site_supervisor">Site Supervisor</option>
+                          <option value="finance">Finance / Accounts Lead</option>
+                        </select>
+                      ) : (
+                        ROLE_LABELS[u.role] || u.roleLabel || u.role
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className="category-actions">
+                <div className="category-actions" style={{display:'flex',gap:6,alignItems:'center'}}>
                   {editingPinUser?.id === u.id ? (
                     <div style={{display:'flex',gap:6,alignItems:'center'}}>
                       <input
@@ -215,9 +275,16 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
                       <button className="btn ghost sm" onClick={() => setEditingPinUser(null)}>Cancel</button>
                     </div>
                   ) : (
-                    <button className="btn ghost sm" onClick={() => { setEditingPinUser(u); setNewPin(u.pin || '1234'); }}>
-                      Reset PIN
-                    </button>
+                    <>
+                      <button className="btn ghost sm" onClick={() => { setEditingPinUser(u); setNewPin(u.pin || '1234'); }}>
+                        Reset PIN
+                      </button>
+                      {canManage && u.id !== currentUser?.id && (
+                        <button className="btn ghost sm danger" title="Delete User Account" onClick={() => handleDeleteUser(u)}>
+                          Delete
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -234,6 +301,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
               <div className="grid2" style={{gap:12,marginTop:8}}>
                 <Field label="Studio Role">
                   <select value={uRole} onChange={e=>setURole(e.target.value)}>
+                    <option value="super_admin">Studio Owner / Super Admin 👑</option>
                     <option value="admin">Principal Architect / Admin</option>
                     <option value="designer">Interior Designer</option>
                     <option value="site_supervisor">Site Supervisor</option>
@@ -303,7 +371,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
           <div className="settings-row"><div><div className="t">Storage</div><div className="d">{smode==='cloud'?'Your studio ledger is synchronized to the protected cloud workspace, with a local recovery cache.':smode==='claude'?'Your data saves automatically inside Claude and persists between sessions.':smode==='local'?'Your data auto-saves in this browser on this device. Clearing browser data erases it — keep occasional backups.':smode==='error'?'Cloud synchronization encountered a version conflict or connection issue. Export a backup before continuing in another session.':'This environment has no storage — download a backup to keep your work.'}</div></div>
             <span className={"pill "+(['memory','error'].includes(smode)?'amber':'green')}>{smode==='cloud'?'Cloud sync':smode==='claude'?'Auto-save · Claude':smode==='local'?'Auto-save · this device':smode==='error'?'Sync needs attention':'Not saving'}</span></div>
           <div className="settings-row"><div><div className="t" style={{color:'var(--clay)'}}>Reset empty workspace</div><div className="d">{protectedHistory?'Locked because financial or operational history exists. Imported backups merge into the ledger and never erase current records.':'Available only before any financial or operational history is recorded.'}</div></div>
-            <button className="btn danger" disabled={protectedHistory} onClick={clearAll}>Reset workspace</button></div>
+            <button className="btn danger" disabled={protectedHistory || !canManage} onClick={clearAll}>Reset workspace</button></div>
         </div>
       </div>
       <div style={{textAlign:'center',color:'var(--muted)',fontSize:12,marginTop:24}}>Studio Ledger · {users.length} team members · {data.projects.length} projects · {data.invoices.length} invoices · {data.expenses.length} expenses</div>

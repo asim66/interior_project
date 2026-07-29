@@ -16,6 +16,7 @@ export function LoginModal({ users = [], onLogin, onRegisterUser, studioName = '
   const [regPin, setRegPin] = useState('');
 
   const ROLE_LABELS = {
+    super_admin: 'Studio Owner / Super Admin 👑',
     admin: 'Principal Architect / Admin',
     designer: 'Interior Designer',
     site_supervisor: 'Site Supervisor',
@@ -32,7 +33,7 @@ export function LoginModal({ users = [], onLogin, onRegisterUser, studioName = '
     e.preventDefault();
     if (!selectedUser) return;
     if (selectedUser.pin && pin.trim() !== selectedUser.pin) {
-      setError('Invalid PIN. Default PIN is 1234.');
+      setError(`Invalid PIN. Default PIN for this account is ${selectedUser.pin || '1234'}.`);
       return;
     }
     setError('');
