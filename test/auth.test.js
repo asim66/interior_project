@@ -48,7 +48,7 @@ test('permission helpers identify super_admin and admin privileges', () => {
   assert.equal(isAdmin(designer), false);
 
   assert.equal(canManageUsers(superAdmin), true);
-  assert.equal(canManageUsers(admin), true);
+  assert.equal(canManageUsers(admin), false);
   assert.equal(canManageUsers(designer), false);
 
   assert.equal(canDelete(supervisor), false);

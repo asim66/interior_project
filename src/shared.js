@@ -282,7 +282,7 @@ export function isAdmin(user) {
 }
 
 export function canManageUsers(user) {
-  return user?.role === 'admin' || user?.role === 'super_admin';
+  return user?.role === 'super_admin';
 }
 
 export function canDelete(user) {

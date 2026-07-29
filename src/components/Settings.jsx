@@ -95,6 +95,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
     finance: 'Finance / Accounts Lead',
   };
 
+  const isSuperAdmin = currentUser?.role === 'super_admin';
   const canManage = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
 
   const handleStartEditProfile = (user) => {
@@ -128,8 +129,8 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
 
   const handleAddUserSubmit = (e) => {
     e.preventDefault();
-    if (!canManage) {
-      flash('Only Super Admins or Admins can add team members.');
+    if (!isSuperAdmin) {
+      flash('Permission denied: Only Super Admin can add team members.');
       return;
     }
     if (!uName.trim() || !uEmail.trim() || !uPin.trim()) {
@@ -161,8 +162,8 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   };
 
   const handleSavePin = (user) => {
-    if (!canManage && currentUser?.id !== user.id) {
-      flash('Permission denied.');
+    if (!isSuperAdmin && currentUser?.id !== user.id) {
+      flash('Permission denied: Only Super Admin can reset user PINs.');
       return;
     }
     if (!newPin.trim()) {
@@ -179,8 +180,8 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   };
 
   const handleDeleteUser = (user) => {
-    if (!canManage) {
-      flash('Only Super Admins or Admins can delete team members.');
+    if (!isSuperAdmin) {
+      flash('Permission denied: Only Super Admin can delete user accounts.');
       return;
     }
     if (user.id === currentUser?.id) {
@@ -202,7 +203,10 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   };
 
   const handleUpdateRole = (user, role) => {
-    if (!canManage) return;
+    if (!isSuperAdmin) {
+      flash('Permission denied: Only Super Admin can change user roles.');
+      return;
+    }
     setData(d => ({
       ...d,
       users: (d.users || []).map(u => u.id === user.id ? { ...u, role, roleLabel: ROLE_LABELS[role] || 'Team Member' } : u)
@@ -212,7 +216,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
 
   const handleClearWorkspace = () => {
     if (!canManage) {
-      flash('Permission denied: Only Super Admins or Admins can reset workspace data.');
+      flash('Permission denied: Only Super Admin or Admins can reset workspace data.');
       return;
     }
     if (confirm('Are you sure you want to clear all sample projects, estimates, material requests, vendor bills, and invoices? Your studio settings and user accounts will be kept.')) {
@@ -262,7 +266,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
       <div className="card" style={{marginTop:18}}>
         <div className="card-h">
           <h3>Studio Team &amp; User Accounts</h3>
-          {canManage && <button className="btn primary sm" onClick={() => setShowAddUser(true)}>+ Add Team Member</button>}
+          {isSuperAdmin && <button className="btn primary sm" onClick={() => setShowAddUser(true)}>+ Add Team Member</button>}
         </div>
         <div className="pad">
           <div className="desc" style={{marginBottom:12}}>
@@ -304,7 +308,7 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
                           {u.role === 'super_admin' && <span className="pill amber" style={{fontSize:10,padding:'2px 6px'}}>SUPER ADMIN 👑</span>}
                         </div>
                         <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>
-                          {u.email} · {canManage ? (
+                          {u.email} · {isSuperAdmin ? (
                             <select
                               value={u.role}
                               onChange={e => handleUpdateRole(u, e.target.value)}
@@ -344,15 +348,17 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
                     </div>
                   ) : editingProfileUser?.id !== u.id && (
                     <>
-                      {(canManage || currentUser?.id === u.id) && (
+                      {(isSuperAdmin || currentUser?.id === u.id) && (
                         <button className="btn ghost sm" title="Edit Name & Email" onClick={() => handleStartEditProfile(u)}>
                           Edit
                         </button>
                       )}
-                      <button className="btn ghost sm" onClick={() => { setEditingPinUser(u); setNewPin(u.pin || '1234'); }}>
-                        Reset PIN
-                      </button>
-                      {canManage && u.id !== currentUser?.id && (
+                      {(isSuperAdmin || currentUser?.id === u.id) && (
+                        <button className="btn ghost sm" onClick={() => { setEditingPinUser(u); setNewPin(u.pin || '1234'); }}>
+                          Reset PIN
+                        </button>
+                      )}
+                      {isSuperAdmin && u.id !== currentUser?.id && (
                         <button className="btn ghost sm danger" title="Delete User Account" onClick={() => handleDeleteUser(u)}>
                           Delete
                         </button>
