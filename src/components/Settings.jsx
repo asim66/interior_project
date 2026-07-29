@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   fmt, curSym, today, EMPTY_DATA, VEN_CATS, normalizeCategories, normalizeData,
-  hasProtectedHistory, mergeLedgerData
+  hasProtectedHistory, mergeLedgerData, uid
 } from '../shared';
 import { Field } from './ui';
 
@@ -16,11 +16,21 @@ function download(name,text,type='text/plain'){
   const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
 }
 
-export function Settings({data,S,setSettings,flash,setData,smode}){
+export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   const [f,setF]=useState({...S});
   const [newCat,setNewCat]=useState('');
   const [editingCat,setEditingCat]=useState('');
   const [editCatName,setEditCatName]=useState('');
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [editingPinUser, setEditingPinUser] = useState(null);
+  const [newPin, setNewPin] = useState('');
+
+  // New user form state
+  const [uName, setUName] = useState('');
+  const [uEmail, setUEmail] = useState('');
+  const [uRole, setURole] = useState('designer');
+  const [uPin, setUPin] = useState('1234');
+
   const fileRef=useRef();
   const set=(k,v)=>setF(s=>({...s,[k]:v}));
   const savedSettings=()=>{const {vendorCategories,...settings}=f;setSettings(settings);flash('Settings saved');};
@@ -72,6 +82,57 @@ export function Settings({data,S,setSettings,flash,setData,smode}){
     flash('Default vendor categories restored');
   };
 
+  const ROLE_LABELS = {
+    admin: 'Principal Architect / Admin',
+    designer: 'Interior Designer',
+    site_supervisor: 'Site Supervisor',
+    finance: 'Finance / Accounts Lead',
+  };
+
+  const handleAddUserSubmit = (e) => {
+    e.preventDefault();
+    if (!uName.trim() || !uEmail.trim() || !uPin.trim()) {
+      flash('Please fill out all fields');
+      return;
+    }
+    if ((data.users || []).some(u => u.email.toLowerCase() === uEmail.trim().toLowerCase())) {
+      flash('User with this email already exists');
+      return;
+    }
+    const avatar = uName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'SM';
+    const newUser = {
+      id: uid('usr'),
+      name: uName.trim(),
+      email: uEmail.trim(),
+      role: uRole,
+      roleLabel: ROLE_LABELS[uRole] || 'Team Member',
+      pin: uPin.trim(),
+      avatar,
+      color: uRole === 'admin' ? '#6366f1' : uRole === 'finance' ? '#f59e0b' : uRole === 'site_supervisor' ? '#10b981' : '#ec4899',
+    };
+
+    setData(d => ({ ...d, users: [...(d.users || []), newUser] }));
+    setUName('');
+    setUEmail('');
+    setUPin('1234');
+    setShowAddUser(false);
+    flash(`Team member ${newUser.name} added`);
+  };
+
+  const handleSavePin = (user) => {
+    if (!newPin.trim()) {
+      flash('PIN cannot be empty');
+      return;
+    }
+    setData(d => ({
+      ...d,
+      users: (d.users || []).map(u => u.id === user.id ? { ...u, pin: newPin.trim() } : u)
+    }));
+    setEditingPinUser(null);
+    setNewPin('');
+    flash(`PIN updated for ${user.name}`);
+  };
+
   const M=n=>fmt(n,S.currency);
   const exportCSV=(coll,label)=>{
     let rows=data[coll];
@@ -92,8 +153,10 @@ export function Settings({data,S,setSettings,flash,setData,smode}){
     if(confirm('Reset this empty workspace?')){setData({...EMPTY_DATA,settings:S});flash('Empty workspace reset');}
   };
 
+  const users = data.users || [];
+
   return(<>
-    <div className="topbar"><div><h1>Settings</h1><div className="desc">Studio details, invoice defaults, and your data.</div></div></div>
+    <div className="topbar"><div><h1>Settings</h1><div className="desc">Studio details, team accounts, invoice defaults, and your data.</div></div></div>
     <div className="content" style={{maxWidth:760}}>
       <div className="card"><div className="card-h"><h3>Studio &amp; invoicing</h3><button className="btn primary sm" onClick={savedSettings}>Save settings</button></div>
         <div className="pad">
@@ -105,6 +168,86 @@ export function Settings({data,S,setSettings,flash,setData,smode}){
             <Field label="Default tax %"><input type="number" value={f.taxRate} onChange={e=>set('taxRate',Number(e.target.value)||0)}/></Field>
           </div>
           <Field label="Invoice number prefix" hint={"Next invoice will be "+f.invPrefix+String(f.invSeq).padStart(3,'0')}><input value={f.invPrefix} onChange={e=>set('invPrefix',e.target.value)}/></Field>
+        </div>
+      </div>
+
+      {/* Studio Team & User Accounts */}
+      <div className="card" style={{marginTop:18}}>
+        <div className="card-h">
+          <h3>Studio Team &amp; User Accounts</h3>
+          <button className="btn primary sm" onClick={() => setShowAddUser(true)}>+ Add Team Member</button>
+        </div>
+        <div className="pad">
+          <div className="desc" style={{marginBottom:12}}>
+            Members of your studio team can log in to update estimates, site requests, schedules, and invoices.
+          </div>
+          <div className="category-list">
+            {users.map(u => (
+              <div className="category-item" key={u.id}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  <div className="avatar" style={{backgroundColor:u.color||'#6366f1'}}>
+                    {u.avatar}
+                  </div>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:13}}>
+                      {u.name} {currentUser?.id === u.id && <span className="pill green" style={{fontSize:10,padding:'2px 6px',marginLeft:6}}>You</span>}
+                    </div>
+                    <div style={{fontSize:11,color:'var(--muted)'}}>
+                      {u.email} · {ROLE_LABELS[u.role] || u.roleLabel || u.role}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="category-actions">
+                  {editingPinUser?.id === u.id ? (
+                    <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                      <input
+                        className="ctl"
+                        style={{width:70,padding:'4px 8px'}}
+                        type="password"
+                        maxLength={6}
+                        value={newPin}
+                        onChange={e => setNewPin(e.target.value)}
+                        placeholder="PIN"
+                        autoFocus
+                      />
+                      <button className="btn primary sm" onClick={() => handleSavePin(u)}>Save</button>
+                      <button className="btn ghost sm" onClick={() => setEditingPinUser(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="btn ghost sm" onClick={() => { setEditingPinUser(u); setNewPin(u.pin || '1234'); }}>
+                      Reset PIN
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {showAddUser && (
+            <form onSubmit={handleAddUserSubmit} style={{marginTop:16,padding:14,background:'var(--surface-2)',borderRadius:8,border:'1px solid var(--line-2)'}}>
+              <h4 style={{margin:'0 0 12px 0',fontSize:14}}>Add New Studio Team Member</h4>
+              <div className="grid2" style={{gap:12}}>
+                <Field label="Full Name"><input required placeholder="e.g. Maya Lin" value={uName} onChange={e=>setUName(e.target.value)}/></Field>
+                <Field label="Email Address"><input required type="email" placeholder="maya@studiovista.in" value={uEmail} onChange={e=>setUEmail(e.target.value)}/></Field>
+              </div>
+              <div className="grid2" style={{gap:12,marginTop:8}}>
+                <Field label="Studio Role">
+                  <select value={uRole} onChange={e=>setURole(e.target.value)}>
+                    <option value="admin">Principal Architect / Admin</option>
+                    <option value="designer">Interior Designer</option>
+                    <option value="site_supervisor">Site Supervisor</option>
+                    <option value="finance">Finance / Accounts Lead</option>
+                  </select>
+                </Field>
+                <Field label="Security PIN (4 digits)"><input required type="password" maxLength={6} value={uPin} onChange={e=>setUPin(e.target.value)}/></Field>
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:12}}>
+                <button type="button" className="btn ghost sm" onClick={() => setShowAddUser(false)}>Cancel</button>
+                <button type="submit" className="btn primary sm">Add Member</button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
@@ -163,7 +306,7 @@ export function Settings({data,S,setSettings,flash,setData,smode}){
             <button className="btn danger" disabled={protectedHistory} onClick={clearAll}>Reset workspace</button></div>
         </div>
       </div>
-      <div style={{textAlign:'center',color:'var(--muted)',fontSize:12,marginTop:24}}>Studio Ledger · {data.projects.length} projects · {data.invoices.length} invoices · {data.expenses.length} expenses · {data.vendors.length} vendors</div>
+      <div style={{textAlign:'center',color:'var(--muted)',fontSize:12,marginTop:24}}>Studio Ledger · {users.length} team members · {data.projects.length} projects · {data.invoices.length} invoices · {data.expenses.length} expenses</div>
     </div>
   </>);
 }

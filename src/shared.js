@@ -40,14 +40,14 @@ export async function loadData(){
   STORAGE_MODE='memory'; return MEM;
 }
 
-export async function saveData(d){
+export async function saveData(d, actorName = 'Studio Member'){
   if(STORAGE_MODE==='cloud'){
     try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}
     SAVE_CHAIN=SAVE_CHAIN.catch(()=>false).then(async()=>{
       const response=await fetch('/api/ledger',{
         method:'PUT',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({data:d,expectedVersion:REMOTE_VERSION})
+        body:JSON.stringify({data:d,expectedVersion:REMOTE_VERSION,actorName})
       });
       if(!response.ok)return false;
       const result=await response.json();
@@ -64,6 +64,28 @@ export async function saveData(d){
     return true;
   }catch(e){} }
   MEM=d; return STORAGE_MODE!=='memory';
+}
+
+export function startCloudSync(onSyncData, intervalMs = 15000) {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') return () => {};
+  const timer = setInterval(async () => {
+    if (STORAGE_MODE !== 'cloud') return;
+    try {
+      const response = await fetch('/api/ledger', { cache: 'no-store' });
+      if (response.ok) {
+        const remote = await response.json();
+        const newVersion = Number(remote.version) || 0;
+        if (newVersion > REMOTE_VERSION && remote.data) {
+          REMOTE_VERSION = newVersion;
+          try { localStorage.setItem(KEY, JSON.stringify(remote.data)); } catch (e) {}
+          if (typeof onSyncData === 'function') {
+            onSyncData(remote.data, remote.updatedBy);
+          }
+        }
+      }
+    } catch (e) {}
+  }, intervalMs);
+  return () => clearInterval(timer);
 }
 
 export const uid=(p='id')=>p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -238,8 +260,48 @@ export function getVendorCategories(data){
   return categories.length?categories:['Other'];
 }
 
+export const SESSION_USER_KEY = 'studio_ledger_session_user_v1';
+
+export const DEFAULT_USERS = [
+  { id: 'usr_admin', name: 'Ananya Sharma', email: 'admin@studiovista.in', role: 'admin', roleLabel: 'Principal Architect', pin: '1234', avatar: 'AS', color: '#6366f1' },
+  { id: 'usr_designer', name: 'Rahul Verma', email: 'designer@studiovista.in', role: 'designer', roleLabel: 'Senior Designer', pin: '1234', avatar: 'RV', color: '#ec4899' },
+  { id: 'usr_supervisor', name: 'Vikram Singh', email: 'site@studiovista.in', role: 'site_supervisor', roleLabel: 'Site Supervisor', pin: '1234', avatar: 'VS', color: '#10b981' },
+  { id: 'usr_finance', name: 'Priya Mehta', email: 'finance@studiovista.in', role: 'finance', roleLabel: 'Finance Lead', pin: '1234', avatar: 'PM', color: '#f59e0b' },
+];
+
+export function loadSession() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SESSION_USER_KEY) || sessionStorage.getItem(SESSION_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function saveSession(user, remember = true) {
+  if (typeof window === 'undefined') return;
+  try {
+    const str = JSON.stringify(user);
+    if (remember) {
+      localStorage.setItem(SESSION_USER_KEY, str);
+    } else {
+      sessionStorage.setItem(SESSION_USER_KEY, str);
+    }
+  } catch (e) {}
+}
+
+export function clearSession() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(SESSION_USER_KEY);
+    sessionStorage.removeItem(SESSION_USER_KEY);
+  } catch (e) {}
+}
+
 export const EMPTY_DATA={
   schemaVersion:SCHEMA_VERSION,
+  users: [...DEFAULT_USERS],
   projects:[],vendors:[],expenses:[],invoices:[],paymentsReceived:[],paymentsMade:[],
   supervisors:[],materialRequests:[],vendorBills:[],pettyExpenses:[],estimates:[],milestones:[],collectionActivities:[],
   settings:{studioName:'Your Studio',address:'',currency:'INR',taxLabel:'GST',taxRate:18,invPrefix:'INV-',invSeq:1,vendorCategories:[...VEN_CATS]}};
@@ -247,6 +309,17 @@ export const EMPTY_DATA={
 export function normalizeData(d){
   const merged={...EMPTY_DATA,...(d||{})};
   const settings={...EMPTY_DATA.settings,...((d&&d.settings)||{})};
+  const rawUsers = Array.isArray(merged.users) && merged.users.length > 0 ? merged.users : DEFAULT_USERS;
+  const users = rawUsers.map(u => ({
+    id: u.id || uid('usr'),
+    name: u.name || 'Studio Member',
+    email: u.email || 'user@studio-ledger.com',
+    role: u.role || 'designer',
+    roleLabel: u.roleLabel || 'Team Member',
+    pin: u.pin || '1234',
+    avatar: u.avatar || (u.name ? u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'SM'),
+    color: u.color || '#6366f1',
+  }));
   const projects=Array.isArray(merged.projects)?merged.projects:[];
   const vendors=Array.isArray(merged.vendors)?merged.vendors:[];
   const projectIds=new Set(projects.map(p=>p.id));
@@ -318,7 +391,7 @@ export function normalizeData(d){
   return{
     ...merged,
     schemaVersion:SCHEMA_VERSION,
-    supervisors,materialRequests,vendorBills,pettyExpenses,estimates,milestones,collectionActivities,
+    users,supervisors,materialRequests,vendorBills,pettyExpenses,estimates,milestones,collectionActivities,
     projects,
     vendors,
     expenses,
