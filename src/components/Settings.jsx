@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   fmt, curSym, today, EMPTY_DATA, VEN_CATS, normalizeCategories, normalizeData,
-  hasProtectedHistory, mergeLedgerData, uid
+  hasProtectedHistory, mergeLedgerData, uid, saveSession
 } from '../shared';
 import { Field } from './ui';
 
@@ -24,6 +24,11 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingPinUser, setEditingPinUser] = useState(null);
   const [newPin, setNewPin] = useState('');
+
+  // Profile editing state
+  const [editingProfileUser, setEditingProfileUser] = useState(null);
+  const [editProfileName, setEditProfileName] = useState('');
+  const [editProfileEmail, setEditProfileEmail] = useState('');
 
   // New user form state
   const [uName, setUName] = useState('');
@@ -91,6 +96,35 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   };
 
   const canManage = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+
+  const handleStartEditProfile = (user) => {
+    setEditingProfileUser(user);
+    setEditProfileName(user.name);
+    setEditProfileEmail(user.email);
+  };
+
+  const handleSaveProfile = (user) => {
+    const name = editProfileName.trim();
+    const email = editProfileEmail.trim();
+    if (!name || !email) {
+      flash('Name and email are required');
+      return;
+    }
+    const avatar = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'SM';
+    const updatedUser = { ...user, name, email, avatar };
+
+    setData(d => ({
+      ...d,
+      users: (d.users || []).map(u => u.id === user.id ? updatedUser : u)
+    }));
+
+    if (currentUser?.id === user.id) {
+      saveSession(updatedUser, true);
+    }
+
+    setEditingProfileUser(null);
+    flash(`Updated profile for ${name}`);
+  };
 
   const handleAddUserSubmit = (e) => {
     e.preventDefault();
@@ -232,29 +266,53 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
                     {u.avatar}
                   </div>
                   <div style={{flex:1}}>
-                    <div style={{fontWeight:600,fontSize:13,display:'flex',alignItems:'center',gap:6}}>
-                      {u.name}
-                      {currentUser?.id === u.id && <span className="pill green" style={{fontSize:10,padding:'2px 6px'}}>You</span>}
-                      {u.role === 'super_admin' && <span className="pill amber" style={{fontSize:10,padding:'2px 6px'}}>SUPER ADMIN 👑</span>}
-                    </div>
-                    <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>
-                      {u.email} · {canManage ? (
-                        <select
-                          value={u.role}
-                          onChange={e => handleUpdateRole(u, e.target.value)}
-                          style={{fontSize:11,padding:'1px 4px',marginLeft:4,border:'1px solid var(--line-2)',borderRadius:4}}
-                          disabled={u.id === currentUser?.id && u.role === 'super_admin'}
-                        >
-                          <option value="super_admin">Studio Owner / Super Admin 👑</option>
-                          <option value="admin">Principal Architect / Admin</option>
-                          <option value="designer">Interior Designer</option>
-                          <option value="site_supervisor">Site Supervisor</option>
-                          <option value="finance">Finance / Accounts Lead</option>
-                        </select>
-                      ) : (
-                        ROLE_LABELS[u.role] || u.roleLabel || u.role
-                      )}
-                    </div>
+                    {editingProfileUser?.id === u.id ? (
+                      <div style={{display:'flex',gap:8,alignItems:'center',marginRight:12}}>
+                        <input
+                          className="ctl"
+                          style={{padding:'4px 8px',fontSize:12,width:140}}
+                          value={editProfileName}
+                          onChange={e => setEditProfileName(e.target.value)}
+                          placeholder="Full Name"
+                          autoFocus
+                        />
+                        <input
+                          className="ctl"
+                          style={{padding:'4px 8px',fontSize:12,width:180}}
+                          value={editProfileEmail}
+                          onChange={e => setEditProfileEmail(e.target.value)}
+                          placeholder="Email"
+                        />
+                        <button className="btn primary sm" onClick={() => handleSaveProfile(u)}>Save</button>
+                        <button className="btn ghost sm" onClick={() => setEditingProfileUser(null)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{fontWeight:600,fontSize:13,display:'flex',alignItems:'center',gap:6}}>
+                          {u.name}
+                          {currentUser?.id === u.id && <span className="pill green" style={{fontSize:10,padding:'2px 6px'}}>You</span>}
+                          {u.role === 'super_admin' && <span className="pill amber" style={{fontSize:10,padding:'2px 6px'}}>SUPER ADMIN 👑</span>}
+                        </div>
+                        <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>
+                          {u.email} · {canManage ? (
+                            <select
+                              value={u.role}
+                              onChange={e => handleUpdateRole(u, e.target.value)}
+                              style={{fontSize:11,padding:'1px 4px',marginLeft:4,border:'1px solid var(--line-2)',borderRadius:4}}
+                              disabled={u.id === currentUser?.id && u.role === 'super_admin'}
+                            >
+                              <option value="super_admin">Studio Owner / Super Admin 👑</option>
+                              <option value="admin">Principal Architect / Admin</option>
+                              <option value="designer">Interior Designer</option>
+                              <option value="site_supervisor">Site Supervisor</option>
+                              <option value="finance">Finance / Accounts Lead</option>
+                            </select>
+                          ) : (
+                            ROLE_LABELS[u.role] || u.roleLabel || u.role
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -274,8 +332,13 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
                       <button className="btn primary sm" onClick={() => handleSavePin(u)}>Save</button>
                       <button className="btn ghost sm" onClick={() => setEditingPinUser(null)}>Cancel</button>
                     </div>
-                  ) : (
+                  ) : editingProfileUser?.id !== u.id && (
                     <>
+                      {(canManage || currentUser?.id === u.id) && (
+                        <button className="btn ghost sm" title="Edit Name & Email" onClick={() => handleStartEditProfile(u)}>
+                          Edit
+                        </button>
+                      )}
                       <button className="btn ghost sm" onClick={() => { setEditingPinUser(u); setNewPin(u.pin || '1234'); }}>
                         Reset PIN
                       </button>
