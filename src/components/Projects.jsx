@@ -2,11 +2,20 @@ import React, { useState } from 'react';
 import { sum, rollup, dstr, invTotal, invReceived, invStatus, today, uid, getPaymentsMade, getPaymentsReceived, projectHasFinancialHistory, projectCostControl, materialRequestEstimate, milestoneHealth } from '../shared';
 import { StatusPill, Empty, Modal, Field, Confirm } from './ui';
 
-export function Projects({data,M,upsert,remove,flash,setOpenProject}){
+export function Projects({data,M,upsert,remove,flash,setOpenProject,currentUser}){
   const [edit,setEdit]=useState(null);const [del,setDel]=useState(null);const [q,setQ]=useState('');
   const list=data.projects.filter(p=>(p.name+p.client).toLowerCase().includes(q.toLowerCase()));
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
   const requestDelete=p=>{
-    if(projectHasFinancialHistory(data,p.id)){flash('Project has financial records and cannot be deleted');return;}
+    if(currentUser?.role === 'site_supervisor'){
+      flash('Permission denied: Site Supervisors cannot delete projects');
+      return;
+    }
+    if(projectHasFinancialHistory(data,p.id) && !isSuperAdmin){
+      flash('Project has financial records and cannot be deleted');
+      return;
+    }
     setDel(p);
   };
   return(<>

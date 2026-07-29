@@ -2,18 +2,23 @@ import React, { useState } from 'react';
 import { estimateTotal, EXP_CATS, fmt, projectCostControl, today, uid, UNITS } from '../shared';
 import { Empty, Field, Modal } from './ui';
 
-export function Estimates({data,setData,M,flash}){
+export function Estimates({data,setData,M,flash,currentUser}){
   const [edit,setEdit]=useState(null);
   const [projectFilter,setProjectFilter]=useState('all');
   const projectName=id=>data.projects.find(p=>p.id===id)?.name||'Unknown project';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const canDeleteEst = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+
   const list=[...data.estimates]
     .filter(e=>projectFilter==='all'||e.projectId===projectFilter)
     .sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(Number(b.version)||0)-(Number(a.version)||0));
+
   const save=estimate=>{
     setData(d=>({...d,estimates:d.estimates.some(e=>e.id===estimate.id)
       ?d.estimates.map(e=>e.id===estimate.id?estimate:e):[...d.estimates,estimate]}));
     flash(edit.id?'Estimate updated':'Estimate created');setEdit(null);
   };
+
   const approve=estimate=>{
     setData(d=>({...d,estimates:d.estimates.map(e=>{
       if(e.id===estimate.id)return{...e,status:'approved',approvedAt:new Date().toISOString()};
@@ -22,9 +27,24 @@ export function Estimates({data,setData,M,flash}){
     })}));
     flash('Estimate approved as project baseline');
   };
+
   const duplicate=estimate=>{
     const versions=data.estimates.filter(e=>e.projectId===estimate.projectId&&e.type===estimate.type).map(e=>Number(e.version)||0);
     setEdit({...estimate,id:undefined,version:Math.max(0,...versions)+1,status:'draft',date:today()});
+  };
+
+  const handleDeleteEstimate = (estimate) => {
+    if (!canDeleteEst) {
+      flash('Permission denied: Only Super Admins or Admins can delete estimates.');
+      return;
+    }
+    if (confirm(`Are you sure you want to delete ${estimate.type === 'rough' ? 'Pre-design budget' : 'Detailed BOQ'} Version ${estimate.version}?`)) {
+      setData(d => ({
+        ...d,
+        estimates: d.estimates.filter(e => e.id !== estimate.id)
+      }));
+      flash(`Estimate Version ${estimate.version} deleted`);
+    }
   };
 
   return(<>
@@ -43,10 +63,18 @@ export function Estimates({data,setData,M,flash}){
           <div className="estimate-total num">{M(estimateTotal(e))}</div>
           <div className="subtle">{e.type==='rough'?`${e.area||0} sq ft · ${e.finishLevel||'standard'} finish · working range ${M(estimateTotal(e)*.85)}–${M(estimateTotal(e)*1.15)}`:`${(e.lines||[]).length} measured cost lines`}</div>
         </div>
-        <div className="card-h">{e.status==='draft'?<button className="btn sm ghost" onClick={()=>setEdit(e)}>Edit</button>:<span className="subtle">Approved versions are locked</span>}<div className="row-actions">
-          <button className="btn sm" onClick={()=>duplicate(e)}>New revision</button>
-          {e.status==='draft'&&<button className="btn sm primary" onClick={()=>approve(e)}>Approve baseline</button>}
-        </div></div>
+        <div className="card-h">
+          {e.status==='draft' || isSuperAdmin ? <button className="btn sm ghost" onClick={()=>setEdit(e)}>Edit</button> : <span className="subtle">Approved versions are locked</span>}
+          <div className="row-actions" style={{display:'flex',gap:6,alignItems:'center'}}>
+            <button className="btn sm" onClick={()=>duplicate(e)}>New revision</button>
+            {e.status==='draft'&&<button className="btn sm primary" onClick={()=>approve(e)}>Approve baseline</button>}
+            {canDeleteEst && (
+              <button className="btn sm ghost danger" title="Delete estimate version" onClick={()=>handleDeleteEstimate(e)}>
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
       </div>)}</div>}
     </div>
     {edit&&<EstimateForm rec={edit} data={data} onClose={()=>setEdit(null)} onSave={save}/>}

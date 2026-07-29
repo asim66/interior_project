@@ -10,7 +10,10 @@ export function Vendors({data,M,upsert,remove,flash,currentUser}){
 
   const requestDelete=v=>{
     if(isSupervisor){flash('Permission denied: Site Supervisors cannot delete vendors');return;}
-    if(vendorHasFinancialHistory(data,v.id)){flash('Vendor has financial records and cannot be deleted');return;}
+    if(vendorHasFinancialHistory(data,v.id) && currentUser?.role !== 'super_admin'){
+      flash('Vendor has financial records and cannot be deleted');
+      return;
+    }
     setDel(v);
   };
   const vstats=v=>{const bills=data.expenses.filter(e=>e.vendorId===v.id);
