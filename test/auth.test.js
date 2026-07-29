@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizeData, DEFAULT_USERS, EMPTY_DATA, isSuperAdmin, isAdmin, canManageUsers
+  normalizeData, DEFAULT_USERS, EMPTY_DATA, isSuperAdmin, isAdmin, canManageUsers, canDelete
 } from '../src/shared.js';
 
 test('normalizeData provides default studio users including Super Admin when none exist', () => {
@@ -38,6 +38,7 @@ test('permission helpers identify super_admin and admin privileges', () => {
   const superAdmin = { role: 'super_admin' };
   const admin = { role: 'admin' };
   const designer = { role: 'designer' };
+  const supervisor = { role: 'site_supervisor' };
 
   assert.equal(isSuperAdmin(superAdmin), true);
   assert.equal(isSuperAdmin(admin), false);
@@ -49,4 +50,8 @@ test('permission helpers identify super_admin and admin privileges', () => {
   assert.equal(canManageUsers(superAdmin), true);
   assert.equal(canManageUsers(admin), true);
   assert.equal(canManageUsers(designer), false);
+
+  assert.equal(canDelete(supervisor), false);
+  assert.equal(canDelete(admin), true);
+  assert.equal(canDelete(designer), true);
 });

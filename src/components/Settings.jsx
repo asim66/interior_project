@@ -382,13 +382,20 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
         </div>
       </div>
 
-      <div className="card" style={{marginTop:18}}><div className="card-h"><h3>Vendor categories</h3><button className="btn sm" onClick={restoreDefaultCategories}>Restore defaults</button></div>
+      <div className="card" style={{marginTop:18}}>
+        <div className="card-h">
+          <h3>Vendor categories</h3>
+          {canManage && <button className="btn sm" onClick={restoreDefaultCategories}>Restore defaults</button>}
+        </div>
         <div className="pad">
-          <div className="settings-row category-add-row"><div><div className="t">Categories</div><div className="d">{categories.length} active</div></div>
-            <form className="category-add" onSubmit={addCategory}>
-              <input className="ctl" placeholder="New category" value={newCat} onChange={e=>setNewCat(e.target.value)}/>
-              <button className="btn primary sm" disabled={!newCat.trim()}>Add</button>
-            </form>
+          <div className="settings-row category-add-row">
+            <div><div className="t">Categories</div><div className="d">{categories.length} active</div></div>
+            {canManage && (
+              <form className="category-add" onSubmit={addCategory}>
+                <input className="ctl" placeholder="New category" value={newCat} onChange={e=>setNewCat(e.target.value)}/>
+                <button className="btn primary sm" disabled={!newCat.trim()}>Add</button>
+              </form>
+            )}
           </div>
           <div className="category-list">
             {categories.map(cat=>(
@@ -402,10 +409,12 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
                   </div>
                 </>:<>
                   <div className="category-name"><span>{cat}</span><span className="pill gray">{categoryLabel(cat)}</span></div>
-                  <div className="category-actions">
-                    <button className="btn ghost sm" onClick={()=>startEditCategory(cat)}>Edit</button>
-                    <button className="btn ghost sm danger" disabled={usage(cat)>0||categories.length<=1} onClick={()=>deleteCategory(cat)}>Delete</button>
-                  </div>
+                  {canManage && (
+                    <div className="category-actions">
+                      <button className="btn ghost sm" onClick={()=>startEditCategory(cat)}>Edit</button>
+                      <button className="btn ghost sm danger" disabled={usage(cat)>0||categories.length<=1} onClick={()=>deleteCategory(cat)}>Delete</button>
+                    </div>
+                  )}
                 </>}
               </div>
             ))}

@@ -95,7 +95,13 @@ export default function App(){
     return { ...d, [coll]: nl };
   });
 
-  const remove = (coll, id) => setData(d => ({ ...d, [coll]: d[coll].filter(x => x.id !== id) }));
+  const remove = (coll, id) => {
+    if (currentUser?.role === 'site_supervisor') {
+      flash('Permission denied: Site Supervisors cannot delete records.');
+      return;
+    }
+    setData(d => ({ ...d, [coll]: d[coll].filter(x => x.id !== id) }));
+  };
   const setSettings = s => setData(d => normalizeData({ ...d, settings: { ...d.settings, ...s } }));
 
   if (!data) return (<div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>Loading your ledger…</div>);

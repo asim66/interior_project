@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { sum, uid, today, expenseBalance, getPaymentsMade, getVendorCategories, normalizeCategories, vendorHasFinancialHistory } from '../shared';
 import { Empty, Confirm, Modal, Field } from './ui';
 
-export function Vendors({data,M,upsert,remove,flash}){
+export function Vendors({data,M,upsert,remove,flash,currentUser}){
   const [edit,setEdit]=useState(null);const [del,setDel]=useState(null);const [q,setQ]=useState('');
   const paymentsMade=getPaymentsMade(data);
   const list=data.vendors.filter(v=>(v.name+v.category).toLowerCase().includes(q.toLowerCase()));
+  const isSupervisor = currentUser?.role === 'site_supervisor';
+
   const requestDelete=v=>{
+    if(isSupervisor){flash('Permission denied: Site Supervisors cannot delete vendors');return;}
     if(vendorHasFinancialHistory(data,v.id)){flash('Vendor has financial records and cannot be deleted');return;}
     setDel(v);
   };
@@ -32,7 +35,9 @@ export function Vendors({data,M,upsert,remove,flash}){
           <td className="r num" style={{color:s.balance>0?'var(--clay)':'var(--muted)'}}>{M(s.balance)}</td>
           <td className="r num" style={{color:s.due>0?'var(--clay)':'var(--muted)'}}>{M(s.due)}</td>
           <td className="r"><div style={{display:'flex',gap:4,justifyContent:'flex-end'}}>
-            <button className="btn sm ghost" onClick={()=>setEdit(v)}>Edit</button><button className="btn sm ghost" onClick={()=>requestDelete(v)}>×</button></div></td>
+            <button className="btn sm ghost" onClick={()=>setEdit(v)}>Edit</button>
+            {!isSupervisor && <button className="btn sm ghost danger" title="Delete vendor" onClick={()=>requestDelete(v)}>×</button>}
+          </div></td>
         </tr>);})}</tbody></table></div></div>}
     </div>
     {edit&&<VendorForm rec={edit} categories={getVendorCategories(data)} onClose={()=>setEdit(null)} onSave={r=>{upsert('vendors',r);flash(r.id?'Vendor updated':'Vendor added');setEdit(null);}}/>}

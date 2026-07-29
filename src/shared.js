@@ -285,6 +285,15 @@ export function canManageUsers(user) {
   return user?.role === 'admin' || user?.role === 'super_admin';
 }
 
+export function canDelete(user) {
+  if (!user || user.role === 'site_supervisor') return false;
+  return true;
+}
+
+export function canModifySettings(user) {
+  return user?.role === 'admin' || user?.role === 'super_admin';
+}
+
 export function loadSession() {
   if (typeof window === 'undefined') return null;
   try {
