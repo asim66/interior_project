@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   fmt, curSym, today, EMPTY_DATA, VEN_CATS, normalizeCategories, normalizeData,
-  hasProtectedHistory, mergeLedgerData, uid, saveSession
+  hasProtectedHistory, mergeLedgerData, uid, saveSession, loadSample
 } from '../shared';
 import { Field } from './ui';
 
@@ -210,6 +210,21 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
     flash(`Updated ${user.name} role to ${ROLE_LABELS[role]}`);
   };
 
+  const handleClearWorkspace = () => {
+    if (!canManage) {
+      flash('Permission denied: Only Super Admins or Admins can reset workspace data.');
+      return;
+    }
+    if (confirm('Are you sure you want to clear all sample projects, estimates, material requests, vendor bills, and invoices? Your studio settings and user accounts will be kept.')) {
+      setData(d => ({
+        ...EMPTY_DATA,
+        settings: S,
+        users: d.users?.length ? d.users : EMPTY_DATA.users,
+      }));
+      flash('Workspace reset! All sample data cleared.');
+    }
+  };
+
   const M=n=>fmt(n,S.currency);
   const exportCSV=(coll,label)=>{
     let rows=data[coll];
@@ -224,11 +239,6 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
   const importJSON=e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();
     r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.projects)throw 0;setData(current=>mergeLedgerData(current,normalizeData(d)));flash('Backup merged without deleting current records');}catch(x){flash('That file could not be read');}};
     r.readAsText(file);e.target.value='';};
-  const protectedHistory=hasProtectedHistory(data);
-  const clearAll=()=>{
-    if(protectedHistory){flash('Financial and operational history cannot be erased');return;}
-    if(confirm('Reset this empty workspace?')){setData({...EMPTY_DATA,settings:S});flash('Empty workspace reset');}
-  };
 
   const users = data.users || [];
 
@@ -438,12 +448,26 @@ export function Settings({data,S,setSettings,flash,setData,smode,currentUser}){
         </div>
       </div>
 
-      <div className="card" style={{marginTop:18}}><div className="card-h"><h3>Data</h3></div>
+      <div className="card" style={{marginTop:18}}>
+        <div className="card-h"><h3>Data &amp; Workspace Reset</h3></div>
         <div className="pad">
-          <div className="settings-row"><div><div className="t">Storage</div><div className="d">{smode==='cloud'?'Your studio ledger is synchronized to the protected cloud workspace, with a local recovery cache.':smode==='claude'?'Your data saves automatically inside Claude and persists between sessions.':smode==='local'?'Your data auto-saves in this browser on this device. Clearing browser data erases it — keep occasional backups.':smode==='error'?'Cloud synchronization encountered a version conflict or connection issue. Export a backup before continuing in another session.':'This environment has no storage — download a backup to keep your work.'}</div></div>
-            <span className={"pill "+(['memory','error'].includes(smode)?'amber':'green')}>{smode==='cloud'?'Cloud sync':smode==='claude'?'Auto-save · Claude':smode==='local'?'Auto-save · this device':smode==='error'?'Sync needs attention':'Not saving'}</span></div>
-          <div className="settings-row"><div><div className="t" style={{color:'var(--clay)'}}>Reset empty workspace</div><div className="d">{protectedHistory?'Locked because financial or operational history exists. Imported backups merge into the ledger and never erase current records.':'Available only before any financial or operational history is recorded.'}</div></div>
-            <button className="btn danger" disabled={protectedHistory || !canManage} onClick={clearAll}>Reset workspace</button></div>
+          <div className="settings-row">
+            <div>
+              <div className="t">Storage Status</div>
+              <div className="d">{smode==='cloud'?'Your studio ledger is synchronized to the protected cloud workspace, with a local recovery cache.':smode==='claude'?'Your data saves automatically inside Claude and persists between sessions.':smode==='local'?'Your data auto-saves in this browser on this device. Clearing browser data erases it — keep occasional backups.':smode==='error'?'Cloud synchronization encountered a version conflict or connection issue. Export a backup before continuing in another session.':'This environment has no storage — download a backup to keep your work.'}</div>
+            </div>
+            <span className={"pill "+(['memory','error'].includes(smode)?'amber':'green')}>{smode==='cloud'?'Cloud sync':smode==='claude'?'Auto-save · Claude':smode==='local'?'Auto-save · this device':smode==='error'?'Sync needs attention':'Not saving'}</span>
+          </div>
+
+          <div className="settings-row">
+            <div>
+              <div className="t" style={{color:'var(--clay)'}}>Reset Workspace &amp; Clear Sample Data</div>
+              <div className="d">Clears all sample projects, estimates, vendor bills, site requests, and invoices. Studio settings and team user accounts are preserved so you can start with a fresh studio ledger.</div>
+            </div>
+            <button className="btn danger" disabled={!canManage} onClick={handleClearWorkspace}>
+              Clear Workspace Data
+            </button>
+          </div>
         </div>
       </div>
       <div style={{textAlign:'center',color:'var(--muted)',fontSize:12,marginTop:24}}>Studio Ledger · {users.length} team members · {data.projects.length} projects · {data.invoices.length} invoices · {data.expenses.length} expenses</div>
