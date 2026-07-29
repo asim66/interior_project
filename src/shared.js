@@ -9,6 +9,8 @@ let SAVE_CHAIN=Promise.resolve(true);
 
 let MEM=null;
 
+
+
 export async function loadData(){
   if(typeof window!=='undefined'&&typeof fetch==='function'){
     try{
@@ -22,8 +24,9 @@ export async function loadData(){
           return remote.data;
         }
         const cached=readLocalData();
-        if(cached){await saveData(cached);return cached;}
-        return null;
+        const initial = cached || normalizeData(EMPTY_DATA);
+        await saveData(initial, 'System');
+        return initial;
       }
     }catch(e){}
   }
@@ -66,7 +69,7 @@ export async function saveData(d, actorName = 'Studio Member'){
   MEM=d; return STORAGE_MODE!=='memory';
 }
 
-export function startCloudSync(onSyncData, intervalMs = 15000) {
+export function startCloudSync(onSyncData, intervalMs = 5000) {
   if (typeof window === 'undefined' || typeof fetch !== 'function') return () => {};
   const timer = setInterval(async () => {
     if (STORAGE_MODE !== 'cloud') return;

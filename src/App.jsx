@@ -24,6 +24,7 @@ export default function App(){
   const [projFilter, setProjFilter] = useState('all');
   const [openProject, setOpenProject] = useState(null);
   const firstLoad = useRef(true);
+  const isIncomingSync = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -41,6 +42,7 @@ export default function App(){
   useEffect(() => {
     if (smode === 'cloud') {
       const stopSync = startCloudSync((freshData, author) => {
+        isIncomingSync.current = true;
         setData(normalizeData(freshData));
         flash(`Live update synced from ${author || 'cloud'}`);
       });
@@ -51,6 +53,10 @@ export default function App(){
   useEffect(() => {
     if (!data) return;
     if (firstLoad.current) { firstLoad.current = false; return; }
+    if (isIncomingSync.current) {
+      isIncomingSync.current = false;
+      return;
+    }
     saveData(data, currentUser?.name).then(ok => setSmode(ok ? (getStorageMode() === 'cloud' ? 'cloud' : getStorageMode()) : 'error'));
   }, [data, currentUser]);
 
